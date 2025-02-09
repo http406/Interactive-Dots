@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Interactive Dots</title>
+        <style>
+            #main-container, canvas {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+            }
+             #infoButton {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 50%;
+                font-size: 20px;
+                cursor: pointer;
+            }
+            #infoModal {
+                display: none;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+                width: 80%;
+                max-width: 400px;
+            }
+            #closeModal {
+                margin-top: 10px;
+                padding: 8px 12px;
+                background: white;
+                color: black;
+                border: none;
+                cursor: pointer;
+                border-radius: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="main-container">
+            <canvas id="canvas"></canvas>
+            <button id="infoButton">&#9432;</button>
+        <div id="infoModal">
+            <p><strong>Interactive Dots</strong></p>
+            <p>Move your mouse or drag your finger over the screen or else touch the screen to interact with the dots! The dots are attracted towards the mouse when clicked.</p>
+            <p>This code creates a grid of colored dots that move dynamically when the mouse is pressed near them.</p>
+            <button id="closeModal">Close</button>
+        </div>
+            <script>
+                var $mainCont, cv, ctx, osCv, osCtx, osDotCv, osDotCtx, center, windowSize;
+                var mouse = { x: -888, y: -888, down: false };
+                var aPoints = [];
+                var DOT_GAP = 45;
+                var DOT_RADIUS = 5;
+                var BG_COLOR = '#000';
+                var DOT_COLORS = ['#e8f707', '#ff5733', '#33ff57', '#3385ff', '#ff33a8'];
+                var APPROACH = 80;
+                var JELLY = 10;
+                var VISCOSITY = 0.1;
+                
+                function init() {
+                    createOffScreenCanvas();
+                    
+                    $mainCont = document.getElementById('main-container');
+                    cv = document.getElementById('canvas');
+                    ctx = cv.getContext('2d');
+                    
+                    setBgColor();
+                    
+                    window.onresize = resize;
+                    cv.addEventListener('mousedown', startDrag);
+                    cv.addEventListener('mousemove', onMouseMove);
+                    cv.addEventListener('mouseup', stopDrag);
+                    cv.addEventListener('mouseleave', stopDrag);
+                    cv.addEventListener('touchstart', startDrag);
+                    cv.addEventListener('touchmove', onTouchMove);
+                    cv.addEventListener('touchend', stopDrag);
+                    
+                    resize();
+                    draw();
+                }
+
+                function createOffScreenCanvas() {
+                    osCv = document.createElement('canvas');
+                    osCtx = osCv.getContext('2d');
+                    
+                    osDotCv = document.createElement('canvas');
+                    osDotCtx = osDotCv.getContext('2d');
+                }
+
+                function drawDot(color) {
+                    var dotCanvas = document.createElement('canvas');
+                    var dotCtx = dotCanvas.getContext('2d');
+                    
+                    dotCanvas.width = DOT_RADIUS * 2;
+                    dotCanvas.height = DOT_RADIUS * 2;
+                    
+                    dotCtx.clearRect(0, 0, DOT_RADIUS * 2, DOT_RADIUS * 2);
+                    dotCtx.beginPath();
+                    dotCtx.fillStyle = color;
+                    dotCtx.arc(DOT_RADIUS, DOT_RADIUS, DOT_RADIUS, 0, Math.PI * 2);
+                    dotCtx.fill();
+                    
+                    return dotCanvas;
+                }
+
+                function resize() {
+                    windowSize = { w: window.innerWidth, h: window.innerHeight };
+                    center = { x: Math.round(windowSize.w / 2), y: Math.round(windowSize.h / 2) };
+                    
+                    cv.width = windowSize.w;
+                    cv.height = windowSize.h;
+                    osCv.width = windowSize.w;
+                    osCv.height = windowSize.h;
+                    
+                    createPoints();
+                }
+
+                function createPoints() {
+                    aPoints = [];
+                    for (var i = 0; i <= windowSize.w + DOT_GAP; i += DOT_GAP) {
+                        for (var j = 0; j <= windowSize.h + DOT_GAP; j += DOT_GAP) {
+                            aPoints.push(new Point(i, j, DOT_COLORS[Math.floor(Math.random() * DOT_COLORS.length)]));
+                        }
+                    }
+                }
+
+                function onMouseMove(e) {
+                    if (mouse.down) {
+                        mouse.x = e.pageX;
+                        mouse.y = e.pageY;
+                    }
+                }
+                
+                function onTouchMove(e) {
+                    if (mouse.down) {
+                        var touch = e.touches[0];
+                        mouse.x = touch.clientX;
+                        mouse.y = touch.clientY;
+                    }
+                }
+                
+                function startDrag(e) {
+                    mouse.down = true;
+                    if (e.touches) {
+                        var touch = e.touches[0];
+                        mouse.x = touch.clientX;
+                        mouse.y = touch.clientY;
+                    } else {
+                        mouse.x = e.pageX;
+                        mouse.y = e.pageY;
+                    }
+                }
+                
+                function stopDrag() {
+                    mouse.down = false;
+                    mouse.x = -888;
+                    mouse.y = -888;
+                }
+                
+                function draw() {
+                    requestAnimationFrame(draw);
+                    render();
+                }
+
+                function render() {
+                    ctx.clearRect(0, 0, cv.width, cv.height);
+                    osCtx.clearRect(0, 0, osCv.width, osCv.height);
+                    
+                    for (var i = 0; i < aPoints.length; i++) {
+                        var p = aPoints[i];
+                        p.update();
+                        osCtx.drawImage(drawDot(p.color), p.x - DOT_RADIUS, p.y - DOT_RADIUS);
+                    }
+                    
+                    ctx.drawImage(osCv, 0, 0);
+                }
+
+                function setBgColor() {
+                    $mainCont.style.backgroundColor = BG_COLOR;
+                }
+
+                function Point(x, y, color) {
+                    this.oX = x + DOT_RADIUS;
+                    this.oY = y + DOT_RADIUS;
+                    this.x = x + DOT_RADIUS;
+                    this.y = y + DOT_RADIUS;
+                    this.offsetX = 0;
+                    this.offsetY = 0;
+                    this.color = color;
+                }
+
+                Point.prototype.update = function() {
+                    this.offsetX += (this.oX - this.x) / JELLY;
+                    this.offsetY += (this.oY - this.y) / JELLY;
+                    
+                    var distX = this.x - mouse.x;
+                    var distY = this.y - mouse.y;
+                    var distance = Math.sqrt(distX * distX + distY * distY);
+                    
+                    if (mouse.down && distance <= APPROACH) {
+                        var angle = Math.atan2(distY, distX);
+                        this.offsetX += (Math.cos(angle) * APPROACH - distX) / 3;
+                        this.offsetY += (Math.sin(angle) * APPROACH - distY) / 3;
+                    }
+                    
+                    this.offsetX *= (1 - VISCOSITY);
+                    this.offsetY *= (1 - VISCOSITY);
+                    
+                    this.x += this.offsetX;
+                    this.y += this.offsetY;
+                };
+
+                window.onload = init;
+                
+                document.getElementById("infoButton").addEventListener("click", function() {
+                document.getElementById("infoModal").style.display = "block";
+            });
+            document.getElementById("closeModal").addEventListener("click", function() {
+                document.getElementById("infoModal").style.display = "none";
+            });
+            </script>
+        </div>
+    </body>
+  </html>
+  
